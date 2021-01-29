@@ -31,11 +31,11 @@ import grpc
 import numpy as np
 import portpicker
 
-from google3.third_party.dm_env_rpc.v1 import connection as dm_env_rpc_connection
-from google3.third_party.dm_env_rpc.v1 import dm_env_adaptor
-from google3.third_party.dm_env_rpc.v1 import dm_env_rpc_pb2
-from google3.third_party.dm_env_rpc.v1 import error
-from google3.third_party.dm_env_rpc.v1 import tensor_utils
+from dm_env_rpc.v1 import connection as dm_env_rpc_connection
+from dm_env_rpc.v1 import dm_env_adaptor
+from dm_env_rpc.v1 import dm_env_rpc_pb2
+from dm_env_rpc.v1 import error
+from dm_env_rpc.v1 import tensor_utils
 
 # Maximum number of times to attempt gRPC connection.
 _MAX_CONNECTION_ATTEMPTS = 10
