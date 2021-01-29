@@ -31,11 +31,11 @@ import grpc
 import numpy as np
 import portpicker
 
-from dm_env_rpc.v1 import connection as dm_env_rpc_connection
-from dm_env_rpc.v1 import dm_env_adaptor
-from dm_env_rpc.v1 import dm_env_rpc_pb2
-from dm_env_rpc.v1 import error
-from dm_env_rpc.v1 import tensor_utils
+from google3.third_party.dm_env_rpc.v1 import connection as dm_env_rpc_connection
+from google3.third_party.dm_env_rpc.v1 import dm_env_adaptor
+from google3.third_party.dm_env_rpc.v1 import dm_env_rpc_pb2
+from google3.third_party.dm_env_rpc.v1 import error
+from google3.third_party.dm_env_rpc.v1 import tensor_utils
 
 # Maximum number of times to attempt gRPC connection.
 _MAX_CONNECTION_ATTEMPTS = 10
@@ -43,7 +43,7 @@ _MAX_CONNECTION_ATTEMPTS = 10
 # Port to expect the docker environment to internally listen on.
 _DOCKER_INTERNAL_GRPC_PORT = 10000
 
-_DEFAULT_DOCKER_IMAGE_NAME = 'gcr.io/deepmind-environments/dm_memorytasks:v1.0.1'
+_DEFAULT_DOCKER_IMAGE_NAME = 'gcr.io/google.com/deepmind-environments-staging/dm_memorytasks:v1.0.1'
 
 _MEMORY_TASK_OBSERVATIONS = ['RGB_INTERLEAVED', 'AvatarPosition', 'Score']
 
@@ -171,7 +171,8 @@ class _MemoryTasksContainerEnv(_MemoryTasksEnv):
   def close(self):
     super(_MemoryTasksContainerEnv, self).close()
     try:
-      self._container.kill()
+      if self._container:
+        self._container.kill()
     except docker.errors.NotFound:
       pass  # Ignore, container has already been closed.
 
@@ -217,11 +218,10 @@ def _can_send_message(connection):
     return False
 
 
-def _create_channel_and_connection(port):
+def _create_channel_and_connection(server_address, credentials):
   """Returns a tuple of `(channel, connection)`."""
   for _ in range(_MAX_CONNECTION_ATTEMPTS):
-    channel = grpc.secure_channel('localhost:{}'.format(port),
-                                  grpc.local_channel_credentials())
+    channel = grpc.secure_channel(server_address, credentials)
     _check_grpc_channel_ready(channel)
     connection = dm_env_rpc_connection.Connection(channel)
     if _can_send_message(connection):
@@ -258,13 +258,27 @@ def _wrap_send(send):
     raise
 
 
+def _connect_to_server(server_address, credentials, settings):
+  channel, connection = _create_channel_and_connection(server_address,
+                                                       credentials)
+  return _make_environment_connection(channel, connection, settings)
+
+
 def _connect_to_environment(port, settings):
   """Helper function for connecting to a running dm_memorytask environment."""
   if settings.level_name not in MEMORY_TASK_LEVEL_NAMES:
     raise ValueError(
         'Level named "{}" is not a valid dm_memorytask level.'.format(
             settings.level_name))
-  channel, connection = _create_channel_and_connection(port)
+  server_address = 'localhost:{}'.format(port)
+  credentials = grpc.local_channel_credentials()
+  channel, connection = _create_channel_and_connection(server_address,
+                                                       credentials)
+  return _make_environment_connection(channel, connection, settings)
+
+
+def _make_environment_connection(channel, connection, settings):
+  """Helper function for connecting to a running dm_memorytask environment."""
   original_send = connection.send
   connection.send = lambda request: _wrap_send(lambda: original_send(request))
   world_name = connection.send(
@@ -352,7 +366,7 @@ def load_from_disk(path, settings):
       '-noaudio',
       # Other command-line flags.
       '--logtostderr',
-      '--server_type=DM_ENV_RPC',
+      '--server_type=GRPC',
       '--uri_address=[::]:{}'.format(port),
   ]
 
@@ -405,3 +419,10 @@ def load_from_docker(settings, name=None):
   return _MemoryTasksContainerEnv(
       _connect_to_environment(port, settings), _MEMORY_TASK_OBSERVATIONS,
       settings.num_action_repeats, container)
+
+
+def connect_to_docker(server_address, credentials, settings, observation_format):
+  return _MemoryTasksContainerEnv(
+      _connect_to_server(server_address, credentials, settings),
+      #_connect_to_environment(server_address, settings)
+      observation_format, settings.num_action_repeats, None)
