@@ -221,7 +221,8 @@ def _can_send_message(connection):
 def _create_channel_and_connection(server_address, credentials):
   """Returns a tuple of `(channel, connection)`."""
   for _ in range(_MAX_CONNECTION_ATTEMPTS):
-    channel = grpc.secure_channel(server_address, credentials)
+    # channel = grpc.secure_channel(server_address, credentials)
+    channel = grpc.insecure_channel(server_address)
     _check_grpc_channel_ready(channel)
     connection = dm_env_rpc_connection.Connection(channel)
     if _can_send_message(connection):
