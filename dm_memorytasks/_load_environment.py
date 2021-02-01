@@ -43,7 +43,7 @@ _MAX_CONNECTION_ATTEMPTS = 10
 # Port to expect the docker environment to internally listen on.
 _DOCKER_INTERNAL_GRPC_PORT = 10000
 
-_DEFAULT_DOCKER_IMAGE_NAME = 'gcr.io/google.com/deepmind-environments-staging/dm_memorytasks:v1.0.1'
+_DEFAULT_DOCKER_IMAGE_NAME = 'gcr.io/deepmind-environments/dm_memorytasks:v1.0.1'
 
 _MEMORY_TASK_OBSERVATIONS = ['RGB_INTERLEAVED', 'AvatarPosition', 'Score']
 
@@ -221,8 +221,11 @@ def _can_send_message(connection):
 def _create_channel_and_connection(server_address, credentials):
   """Returns a tuple of `(channel, connection)`."""
   for _ in range(_MAX_CONNECTION_ATTEMPTS):
-    # channel = grpc.secure_channel(server_address, credentials)
-    channel = grpc.insecure_channel(server_address)
+    if credentials:
+      channel = grpc.secure_channel(server_address, credentials)
+    else
+      print(server_address)
+      channel = grpc.insecure_channel(server_address)
     _check_grpc_channel_ready(channel)
     connection = dm_env_rpc_connection.Connection(channel)
     if _can_send_message(connection):
@@ -422,8 +425,7 @@ def load_from_docker(settings, name=None):
       settings.num_action_repeats, container)
 
 
-def connect_to_docker(server_address, credentials, settings, observation_format):
+def connect_to_docker(server_address, settings, observation_format):
   return _MemoryTasksContainerEnv(
-      _connect_to_server(server_address, credentials, settings),
-      #_connect_to_environment(server_address, settings)
+      _connect_to_server(server_address, None, settings),
       observation_format, settings.num_action_repeats, None)
